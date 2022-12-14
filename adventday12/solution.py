@@ -1,24 +1,11 @@
-from os import system
-import sys
-
-global toprow
-
 def print_maze(maze):
-    print(toprow)
+    print('  ' + ' '.join(map(lambda d: map_int(d), list(range(0, len(maze[0]))))))
     
     for i in range(0, len(maze)):
         c = str(i)
         if len(c) < 2:
             c = '0' + c
-        print(c + ' '.join(maze[i]))
-        
-def manhattan(x,y,i,j):
-    return abs(x - i) + abs(y - j)
-    
-def euclid(coords, top):
-    y = top[0] - coords[0]
-    x = top[1] - coords[1]
-    return x*x + y*y
+        print(c + ' ' + '  '.join(maze[i]))
 
 def get_char_height(c):
     # assume end point is highest point on the map
@@ -29,28 +16,13 @@ def get_char_height(c):
         return 96
     # we only care about difference between tiles, so just use the char value
     else:
-        return ord(c)
+        return ord(c)    
         
-def can_move_up(coords, maze):
-    y = coords[0]
-    x = coords[1]
-    h = get_char_height(maze[y][x])
-    t = h + 1
-    
-    if y > 0 and get_char_height(maze[y-1][x]) == t:
-        return True
-    if y < len(maze) - 1 and get_char_height(maze[y+1][x]) == t:
-        return True
-    if x > 0 and get_char_height(maze[y][x-1]) == t:
-        return True
-    if x < len(maze[0]) - 1 and get_char_height(maze[y][x+1]) == t:
-        return True
-    return False
-    
-        
-class Fifo:
+# 'First In First Out' Queue
+class Fifo:    
 
-    content = []
+    def __init__(self):
+        self.content = []
     
     def push(self, elem):
         self.content.append(elem)
@@ -63,50 +35,32 @@ class Fifo:
     def has_elements(self):
         return len(self.content) > 0
         
+# A Node represents one step in a path
 class Node:
 
-    def __init__(self, parent, coords, end, map, dir):
+    def __init__(self, parent, coords, map):
         self.parent = parent
         self.x = coords[1]
-        self.y = coords[0]
+        self.y = coords[0]    
+        
         self.coords = coords
         self.s = map[coords[0]][coords[1]]
-        self.dir = dir
-        self.path = [] if parent == None else parent.path + [(parent.y, parent.x)]
-        
-        # cost is one more than the last step
-        self.g = parent.g + 1 if parent is not None else 1
+        self.path = [] if parent == None else parent.path + [(parent.y, parent.x)]   
         
         self.height = get_char_height(self.s)
         
     def __str__(self):
-        return f"x: {self.x}, y: {self.y}, symbol: {self.s}, weight: {self.g}, distance: {self.h}, moved from parent: {self.dir}"
+        return f"x: {self.x}, y: {self.y}, symbol: {self.s}, path length: {len(self.path)}"
         
-    def gen_successors(self, map, end):
+    def gen_successors(self, map, succ_fun):
         successors = []
         x = self.x
         y = self.y
         
-        up = y - 1
-        down = y + 1
-        left = x - 1
-        right = x + 1
-        
-        # we can move up or down, or stay on the same level, in respect to the current node, as long as the step is at most one
-        h_range = [self.height - 1, self.height, self.height +1]
-        
-        # Up
-        if up >= 0 and up < len(map) and get_char_height(map[up][x]) <= self.height + 1:
-            successors.append(Node(self, (up, x), end, map, '^'))
-        # Down
-        if down >= 0 and down < len(map) and get_char_height(map[down][x]) <= self.height + 1:
-            successors.append(Node(self, (down, x), end, map, 'V'))         
-        # Left
-        if left >= 0 and left < len(map[0]) and get_char_height(map[y][left]) <= self.height + 1:
-            successors.append(Node(self, (y, left), end, map, '<'))
-        # Right
-        if right >= 0 and right < len(map[0]) and get_char_height(map[y][right]) <= self.height + 1:
-            successors.append(Node(self, (y, right), end, map, '>'))        
+        for c in [(y - 1, x), (y + 1, x), (y, x - 1), (y, x + 1)]:
+            h, w = c
+            if h >= 0 and w >= 0 and h < len(map) and w < len(map[0]) and succ_fun(get_char_height(map[h][w]), self.height):
+                successors.append(Node(self, (h, w), map))
         
         return successors
         
@@ -116,42 +70,42 @@ def map_int(val):
         return '0' + c
     return c
         
-def breadth_first(node, endpoint = 'E'):    
+def breadth_first(node, endpoint, succ_fun):    
     queue = Fifo()
     queue.push(node)
     visited = [node.coords]
-    step = 0
-    
-    path_lengths = []
     
     while queue.has_elements():
         current_node = queue.pop()
         
-        system('cls')
-    
-        maze[current_node.y][current_node.x] = '@'
-    
-        print('depth', len(current_node.path))
-        print('elements in queue', len(queue.content))
-        print('step', step)
-    
-        print_maze(maze)
-        
-        maze[current_node.y][current_node.x] = current_node.s
-        
         if current_node.s == endpoint:
             return current_node
-        for child in current_node.gen_successors(maze, end_coords):
+        for child in current_node.gen_successors(maze, succ_fun):
             if child.coords not in visited:
                 visited.append(child.coords)
                 queue.push(child)
-                
-        step += 1
     return current_node
+            
+def search_and_calc_length(coords, end, fun):
+    local_maze = [[c for c in line.strip()] for line in open('input.txt').readlines()]
 
+    end = breadth_first(Node(None, coords, local_maze), end, fun)
+        
+    node = end
+
+    while node is not None:
+        local_maze[node.y][node.x] = '#'
+        node = node.parent
+        
+    local_maze[coords[0]][coords[1]] = 'S'
+    local_maze[end.y][end.x] = 'E'
+                
+    print_maze(local_maze)
+        
+    return len(end.path)
+    
+# Calc start and end points
 maze = [[c for c in line.strip()] for line in open('input.txt').readlines()]
-
-toprow = ' ' + ''.join(map(lambda d: map_int(d), list(range(0, len(maze[0])))))
 
 start_coords = (0, 0)
 end_coords = (0, 0)
@@ -163,42 +117,11 @@ for y in range(0, len(maze)):
         if maze[y][x] == 'E':
             end_coords = (y,x)
     
-
-end = breadth_first(Node(None, start_coords, end_coords, maze, 'Start'))
-
-# system('cls')
-
-# print_maze(maze)
+fun_can_move_to = lambda target, source: target <= source + 1
+fun_could_move_from = lambda source, target: target <= source + 1
     
-node = end
+# Shortest route from S to (any) E
+print('solution 01', search_and_calc_length(start_coords, 'E', fun_can_move_to))
 
-first_a_found = False
-
-steps = 0
-
-while node is not None:
-    maze[node.y][node.x] = '#'
-    node = node.parent
-    if not first_a_found:
-        if node.s == 'a':
-            first_a_found = True
-            start = node
-        else:
-            steps += 1
-            
-print_maze(maze)
-    
-print('solution 01:', len(end.path))
-
-valid_starts = []
-
-for i in range(0, len(maze)):
-    for j in range(0, len(maze[i])):
-        if maze[i][j] == 'a' and can_move_up((i,j), maze):
-            valid_starts.append((i,j))
-
-print(len(valid_starts))
-
-starts_not_covered = [s for s in valid_starts if s not in end.path]
-
-print(len(starts_not_covered))
+# Shortest route from E to (any) a
+print('solution 02', search_and_calc_length(end_coords, 'a', fun_could_move_from))
