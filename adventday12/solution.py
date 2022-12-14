@@ -2,6 +2,15 @@ from os import system
 import sys
 
 global toprow
+
+def print_maze(maze):
+    print(toprow)
+    
+    for i in range(0, len(maze)):
+        c = str(i)
+        if len(c) < 2:
+            c = '0' + c
+        print(c + ' '.join(maze[i]))
         
 def manhattan(x,y,i,j):
     return abs(x - i) + abs(y - j)
@@ -22,6 +31,23 @@ def get_char_height(c):
     else:
         return ord(c)
         
+def can_move_up(coords, maze):
+    y = coords[0]
+    x = coords[1]
+    h = get_char_height(maze[y][x])
+    t = h + 1
+    
+    if y > 0 and get_char_height(maze[y-1][x]) == t:
+        return True
+    if y < len(maze) - 1 and get_char_height(maze[y+1][x]) == t:
+        return True
+    if x > 0 and get_char_height(maze[y][x-1]) == t:
+        return True
+    if x < len(maze[0]) - 1 and get_char_height(maze[y][x+1]) == t:
+        return True
+    return False
+    
+        
 class Fifo:
 
     content = []
@@ -39,14 +65,12 @@ class Fifo:
         
 class Node:
 
-    def __init__(self,parent, coords, end, map, dir):
+    def __init__(self, parent, coords, end, map, dir):
         self.parent = parent
         self.x = coords[1]
         self.y = coords[0]
         self.coords = coords
         self.s = map[coords[0]][coords[1]]
-        if self.s == 'E':
-            self.s == '{'
         self.dir = dir
         self.path = [] if parent == None else parent.path + [(parent.y, parent.x)]
         
@@ -54,23 +78,6 @@ class Node:
         self.g = parent.g + 1 if parent is not None else 1
         
         self.height = get_char_height(self.s)
-        
-        # heuristic is euclid distance
-        self.h = euclid(end, coords)
-        self.f = self.g + self.h
-        
-    def set(self, node):
-        self.parent = node.parent
-        self.x = node.x
-        self.y = node.y
-        self.coords = node.coords
-        self.s = node.s
-        self.dir = node.dir
-        self.path = node.path
-        self.g = node.g
-        self.height = node.height
-        self.h = node.h
-        self.f = node.f
         
     def __str__(self):
         return f"x: {self.x}, y: {self.y}, symbol: {self.s}, weight: {self.g}, distance: {self.h}, moved from parent: {self.dir}"
@@ -101,7 +108,7 @@ class Node:
         if right >= 0 and right < len(map[0]) and get_char_height(map[y][right]) <= self.height + 1:
             successors.append(Node(self, (y, right), end, map, '>'))        
         
-        return sorted(successors, key=lambda n: n.f)
+        return successors
         
 def map_int(val):
     c = str(val)
@@ -109,7 +116,7 @@ def map_int(val):
         return '0' + c
     return c
         
-def breadth_first(node):    
+def breadth_first(node, endpoint = 'E'):    
     queue = Fifo()
     queue.push(node)
     visited = [node.coords]
@@ -128,17 +135,11 @@ def breadth_first(node):
         print('elements in queue', len(queue.content))
         print('step', step)
     
-        print(toprow)
-
-        for i in range(0, len(maze)):
-            c = str(i)
-            if len(c) < 2:
-                c = '0' + c
-            print(c + ' '.join(maze[i]))
+        print_maze(maze)
         
         maze[current_node.y][current_node.x] = current_node.s
         
-        if current_node.s == 'E':
+        if current_node.s == endpoint:
             return current_node
         for child in current_node.gen_successors(maze, end_coords):
             if child.coords not in visited:
@@ -165,20 +166,39 @@ for y in range(0, len(maze)):
 
 end = breadth_first(Node(None, start_coords, end_coords, maze, 'Start'))
 
+# system('cls')
+
+# print_maze(maze)
+    
 node = end
+
+first_a_found = False
+
+steps = 0
 
 while node is not None:
     maze[node.y][node.x] = '#'
     node = node.parent
-
-system('cls')
-
-print(toprow)
+    if not first_a_found:
+        if node.s == 'a':
+            first_a_found = True
+            start = node
+        else:
+            steps += 1
+            
+print_maze(maze)
     
+print('solution 01:', len(end.path))
+
+valid_starts = []
+
 for i in range(0, len(maze)):
-    c = str(i)
-    if len(c) < 2:
-        c = '0' + c
-    print(c + ' '.join(maze[i]))
-    
-print(len(end.path))
+    for j in range(0, len(maze[i])):
+        if maze[i][j] == 'a' and can_move_up((i,j), maze):
+            valid_starts.append((i,j))
+
+print(len(valid_starts))
+
+starts_not_covered = [s for s in valid_starts if s not in end.path]
+
+print(len(starts_not_covered))
