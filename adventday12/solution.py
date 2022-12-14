@@ -1,11 +1,10 @@
 def print_maze(maze):
-    print('  ' + ' '.join(map(lambda d: map_int(d), list(range(0, len(maze[0]))))))
+    to_two_digit = lambda d: '0' + str(d) if d < 10 else str(d)
+
+    print('  ' + ' '.join(map(to_two_digit, list(range(0, len(maze[0]))))))
     
     for i in range(0, len(maze)):
-        c = str(i)
-        if len(c) < 2:
-            c = '0' + c
-        print(c + ' ' + '  '.join(maze[i]))
+        print(to_two_digit(i) + ' ' + '  '.join(maze[i]))
 
 def get_char_height(c):
     # assume end point is highest point on the map
@@ -63,12 +62,6 @@ class Node:
                 successors.append(Node(self, (h, w), map))
         
         return successors
-        
-def map_int(val):
-    c = str(val)
-    if len(c) < 2:
-        return '0' + c
-    return c
         
 def breadth_first(node, endpoint, succ_fun):    
     queue = Fifo()
